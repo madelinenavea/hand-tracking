@@ -1,2 +1,4 @@
 # hand-tracking
-Hand gestures and drawing!
+Side project I decided to do while bored
+
+*Note: Still in progress!*
