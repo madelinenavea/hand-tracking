@@ -4,8 +4,8 @@
 # hand gestures you can do: 
 # 1. peace sign
 # 2. middle finger
-# 3. closed fist: if you close your fist and turn, then it changes the color that you draw with
-# 4. open palm
+# 3. closed fist
+# 4. open palm: if you close your fist and turn, then it changes the color that you draw with
 # 5. hang loose
 # 6. thumbs down
 # 7. rock and roll
@@ -99,12 +99,12 @@ def classify_gesture(fingers, hand_landmarks):
     # thumbs down
     if thumb and curled_index and curled_middle and curled_ring and curled_pinky:
         if thumb_tip.y > wrist.y:
-            return "Big sad"
+            return "Thumbs down. Nuh uh!"
 
     # rock and rollll || <3
     if pointer and not middle and not ring and pinky:
         if thumb:
-            return "Ur kinda cool"
+            return "I love you!"
         else:
             return "Rock and Rollllll!!!!!"
 
@@ -119,7 +119,7 @@ def classify_gesture(fingers, hand_landmarks):
     other_fingers = middle and ring and pinky
 
     if pinch_dist < 0.03 and other_fingers:
-        return "Ugh fine ok"
+        return "OK"
 
     # closed fist
     curled_index  = curled_fingers(index_tip, hand_landmarks.landmark[6], hand_landmarks.landmark[5])
@@ -141,7 +141,7 @@ def classify_gesture(fingers, hand_landmarks):
         if index_middle_dist < 0.04:
             return "Eraser"
         else:
-            return "Peaceeeee duddeeee"
+            return "Peaceee!!!!"
 
     # pointer
     if pointer and not middle and not ring and not pinky:
@@ -149,7 +149,7 @@ def classify_gesture(fingers, hand_landmarks):
 
     # middle finger
     if middle and not pointer and not ring and not pinky:
-        return "Fuck you whore"
+        return "Middle finger"
 
     # open palm
     if pointer and middle and ring and pinky:
@@ -158,6 +158,21 @@ def classify_gesture(fingers, hand_landmarks):
     return None
 
 
+def hand_roll_angle(hand_landmarks):
+    wrist = hand_landmarks.landmark[0]
+    index_mcp = hand_landmarks.landmark[5]
+    pinky_mcp = hand_landmarks.landmark[17]
+
+    dx = pinky_mcp.x - index_mcp.x
+    dy = pinky_mcp.y - index_mcp.y
+    angle = math.degrees(math.atan2(dy, dx))
+
+    if angle > 180:
+        angle -= 360
+    if angle < -180:
+        angle += 360
+
+    return angle
 
 #===================
 # TRACKING VIDEO  
@@ -168,9 +183,17 @@ def run_tracking():
     prev_point = None
 
     # testing color turns
-    colors = [(255,0,0), (0,255,0), (0,0,255), (255,255,0), (255,0,255), (0,255,255), (255, 255, 255)]
+    colors = [(255, 255, 255), # white
+              (255,0,0), # red
+              (255, 151, 0), # orange
+              (255,255,0), # yellow
+              (0,255,0), # green
+              (0,0,255), # blue
+              (151, 0 ,255), # purple
+              (255,0,255)] # pink
+
     color_index = 0
-    current_color = colors[color_index]
+    current_color = 0
 
     # init MediaPipe Hands model
     with mp_hands.Hands(
@@ -224,15 +247,32 @@ def run_tracking():
                     x = frame_w - x  
                     draw_point = (x, y)
 
-                    if gesture == "Closed Fist":
+                    if gesture == "Open Palm":
                         # compute simple roll using wrist which is middle MCP
                         wrist = hand_landmarks.landmark[0]
-                        middle_mcp = hand_landmarks.landmark[9]
-                        dx = middle_mcp.x - wrist.x
-                        # if fist is tilted enough, switch color
-                        if dx > 0.10:
-                            color_index = (color_index + 1) % len(colors)
-                            current_color = colors[color_index]
+                        middle_tip = hand_landmarks.landmark[12]
+                        dx = middle_tip.x - wrist.x
+                        # if open hand is tilted enough, switch color
+                        if dx < -0.10:
+                            color_index = 0
+                        elif -0.10 <= dx < -0.05:
+                            color_index = 1
+                        elif -0.05 <= dx < 0.00:
+                            color_index = 2
+                        elif 0.00 <= dx < 0.05:
+                            color_index = 3
+                        elif 0.05 <= dx < 0.10:
+                            color_index = 4
+                        elif 0.10 <= dx < 0.15:
+                            color_index = 5
+                        elif 0.15 <= dx < 0.20:
+                            color_index = 6
+                        else:
+                            color_index = 7
+                        current_color = colors[color_index]
+
+
+               # white, red, orange, yellow, green, blue, purple, pink 
 
             # flip frame
             frame = cv2.flip(frame, 1)
@@ -259,7 +299,9 @@ def run_tracking():
                 prev_point = None
 
             # combine canvas and camera
-            frame = cv2.add(frame, canvas)
+            gray = cv2.cvtColor(canvas, cv2.COLOR_BGR2GRAY)
+            mask = gray > 0
+            frame[mask] = canvas[mask]
             
             # make color wheel
             circle_radius = 20
